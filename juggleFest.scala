@@ -4,7 +4,8 @@ import java.io._
 object JuggleFest {
 	var jugglersPerCircuit = 0;
 	def main(args: Array[String]) {
-		val contents = io.Source.fromFile(args(0)).mkString.split("\n\n");
+		val contents = io.Source.fromFile(args(0)).mkString.split("\n\r");
+		val numRegex = """.\:(\d+)""".r
 		// Collect circuits and jugglers into maps
 		val circuits = contents(0).split("\n").foldLeft(Map.empty[String, Circuit])(
 			(map: Map[String, Circuit], str: String) => {
@@ -12,13 +13,15 @@ object JuggleFest {
 				val name = chopped(1)
 				val coordination = chopped(2).drop(2).toInt
 				val endurance = chopped(3).drop(2).toInt
-				val pizzazz = chopped(4).drop(2).toInt
+				val pizzazzMatcher = numRegex.findAllIn(chopped(4))
+				pizzazzMatcher.next
+				val pizzazz = pizzazzMatcher.group(1).toInt
 				map + (name -> new Circuit(name, coordination, endurance, pizzazz))
 			}
 		)
 
 		// First result of this split is a blank string, so use tail to skip it
-		val jugglers = contents(1).split("\n").foldLeft(Map.empty[String, Juggler])(
+		val jugglers = contents(1).split("\n").tail.foldLeft(Map.empty[String, Juggler])(
 			(map: Map[String, Juggler], str: String) => {
 				val chopped = str.split(" ")
 				val name = chopped(1)
