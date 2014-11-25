@@ -1,31 +1,31 @@
 import collection.immutable.SortedMap
+import java.io._
 
 object JuggleFest {
 	var jugglersPerCircuit = 0;
 	def main(args: Array[String]) {
-		val contents = io.Source.fromFile(args(0)).mkString.split("\n\n");
-		
+		val contents = io.Source.fromFile(args(0)).mkString.split("\n\r");
 		// Collect circuits and jugglers into maps
-		val circuitsString = contents(0).split("\n");
-		val circuits = circuitsString.foldLeft(Map.empty[String, Circuit])(
+		val circuits = contents(0).split("\n").foldLeft(Map.empty[String, Circuit])(
 			(map: Map[String, Circuit], str: String) => {
 				val chopped = str.split(" ")
 				val name = chopped(1)
-				val coordination = chopped(2).toInt
-				val endurance = chopped(3).toInt
-				val pizzazz = chopped(4).toInt
+				val coordination = chopped(2)(2).asDigit
+				val endurance = chopped(3)(2).asDigit
+				val pizzazz = chopped(4)(2).asDigit
 				map + (name -> new Circuit(name, coordination, endurance, pizzazz))
 			}
 		)
 
-		val jugglers = contents(0).split("\n").foldLeft(Map.empty[String, Juggler])(
+		// First result of this split is a blank string, so use tail to skip it
+		val jugglers = contents(1).split("\n").tail.foldLeft(Map.empty[String, Juggler])(
 			(map: Map[String, Juggler], str: String) => {
 				val chopped = str.split(" ")
 				val name = chopped(1)
-				val coordination = chopped(2).toInt
-				val endurance = chopped(3).toInt
-				val pizzazz = chopped(4).toInt
-				val preferences: Array[Circuit] = chopped(5).split(",").map(str => (circuits get str) match {
+				val coordination = chopped(2)(2).asDigit
+				val endurance = chopped(3)(2).asDigit
+				val pizzazz = chopped(4)(2).asDigit
+				val preferences: Array[Circuit] = chopped(5).split(",").map(str => (circuits get str.trim) match {
 					case Some(circuit) => circuit
 					case None => throw new Exception("Invalid Input: No such circuit: " + str)
 				});
@@ -33,65 +33,69 @@ object JuggleFest {
 				map + (name -> new Juggler(name, coordination, endurance, pizzazz, preferences));
 			}
 		)
-			
-
 
 		jugglersPerCircuit = jugglers.size / circuits.size
-		println(jugglersPerCircuit)
-
+		println(jugglersPerCircuit);
 		// Compute fit for each juggler and their preferences
+		// Add everyone to the first preference
 
-
-		def parseCircuit(map: Map[String, Circuit], str: String): Map[String, Circuit] = {
-			val chopped = str.split(" ")
-			val name = chopped(1)
-			val coordination = chopped(2).toInt
-			val endurance = chopped(3).toInt
-			val pizzazz = chopped(4).toInt
-			map + (name -> new Circuit(name, coordination, endurance, pizzazz))
+		var counter = 0;
+		while (jugglers.exists(!_._2.selected)) {
+			jugglers.filter(!_._2.selected).foreach { case(name, juggler) => 
+				addJugglerToCircuit(juggler, juggler.preferences(counter))
+			}
+			counter = counter + 1
 		}
 
-		def parseJuggler(map: Map[String, Juggler], str: String): Map[String, Juggler] = {
-			val chopped = str.split(" ")
-			val name = chopped(1)
-			val coordination = chopped(2).toInt
-			val endurance = chopped(3).toInt
-			val pizzazz = chopped(4).toInt
-			val preferences: Array[Circuit] = chopped(5).split(",").map(str => (circuits get str) match {
-				case Some(circuit) => circuit
-				case None => throw new Exception("Invalid Input: No such circuit: " + str)
-			});
+		println(jugglers.filter(!_._2.selected).size)
+	}
 
-			map + (name -> new Juggler(name, coordination, endurance, pizzazz, preferences));
+	def addJugglerToCircuit(juggler: Juggler, circuit: Circuit) {
+		// Only add if there is room or if the juggler is a better fit
+		if (!circuit.isFull) {
+			circuit addJuggler juggler
+		} else if (juggler isBetterFit circuit) {
+			circuit removeJuggler (circuit.selections firstKey)
+			circuit addJuggler juggler
 		}
 	}
 }
 
-class Circuit(name: String, coordination: Int, endurance: Int, pizzazz: Int) {
+class Circuit(val name: String, val coordination: Int, val endurance: Int, val pizzazz: Int) {
 	// Keep selections naturally sorted - worst fit will be first
 	var selections = SortedMap.empty[Int, Juggler];
 
+	def isFull: Boolean = selections.size >= JuggleFest.jugglersPerCircuit
+
 	def addJuggler(juggler: Juggler) {
-		if (selections.size == JuggleFest.jugglersPerCircuit) {
-			selections = selections - selections.firstKey;
+		selections = selections + (juggler.fit(this) -> juggler);
+		juggler.selected = true
+	}
+
+	def removeJuggler(fit: Int) {
+		val juggler = selections get fit match {
+			case Some(juggler) => juggler
+			case None => throw new Exception("No such juggler: " + fit)
 		}
 
-		selections = selections + (juggler.fit(this) -> juggler);
+		selections = selections - fit
+		juggler.selected = false
 	}
 }
 
-class Juggler(name: String, coordination: Int, endurance: Int, pizzazz: Int, preferences: Array[Circuit]) {
+class Juggler(val name: String, val coordination: Int, val endurance: Int, val pizzazz: Int, val preferences: Array[Circuit]) {
 	var selected = false;
 
 	def fit(circuit: Circuit): Int = {
 		// dot product of this and the circuit's attributes
-		println(circuit);
-		0
-		/*(coordination * circuit.coordination) + 
+		(coordination * circuit.coordination) + 
 		(endurance * circuit.endurance) + 
-		(pizzazz * circuit.pizzazz)*/
+		(pizzazz * circuit.pizzazz)
+		
 	}
 
 	def isBetterFit(circuit: Circuit): Boolean = 
 		circuit.selections.exists(fit(circuit) > _._2.fit(circuit)) 
 }
+
+JuggleFest.main(args);
