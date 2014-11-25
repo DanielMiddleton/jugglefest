@@ -40,7 +40,7 @@ object JuggleFest {
 		// Add everyone to the first preference
 
 		var counter = 0;
-		while (jugglers.exists(!_._2.selected)) {
+		while (counter < 10) {
 			jugglers.filter(!_._2.selected).foreach { case(name, juggler) => 
 				addJugglerToCircuit(juggler, juggler.preferences(counter))
 			}
@@ -52,10 +52,7 @@ object JuggleFest {
 
 	def addJugglerToCircuit(juggler: Juggler, circuit: Circuit) {
 		// Only add if there is room or if the juggler is a better fit
-		if (!circuit.isFull) {
-			circuit addJuggler juggler
-		} else if (juggler isBetterFit circuit) {
-			circuit removeJuggler (circuit.selections firstKey)
+		if (!circuit.isFull || juggler.isBetterFit(circuit)) {
 			circuit addJuggler juggler
 		}
 	}
@@ -63,23 +60,21 @@ object JuggleFest {
 
 class Circuit(val name: String, val coordination: Int, val endurance: Int, val pizzazz: Int) {
 	// Keep selections naturally sorted - worst fit will be first
-	var selections = SortedMap.empty[Int, Juggler];
+	var selections = List.empty[Juggler]
 
 	def isFull: Boolean = selections.size >= JuggleFest.jugglersPerCircuit
 
 	def addJuggler(juggler: Juggler) {
-		selections = selections + (juggler.fit(this) -> juggler);
+		if (isFull) {
+			selections.head.selected = false
+			selections = selections.tail
+		}
+		selections = (juggler :: selections).sortWith(comparator);
 		juggler.selected = true
 	}
 
-	def removeJuggler(fit: Int) {
-		val juggler = selections get fit match {
-			case Some(juggler) => juggler
-			case None => throw new Exception("No such juggler: " + fit)
-		}
-
-		selections = selections - fit
-		juggler.selected = false
+	def comparator(jugglerOne: Juggler, jugglerTwo: Juggler): Boolean = {
+		(jugglerOne fit this) < (jugglerTwo fit this)
 	}
 }
 
@@ -95,7 +90,7 @@ class Juggler(val name: String, val coordination: Int, val endurance: Int, val p
 	}
 
 	def isBetterFit(circuit: Circuit): Boolean = 
-		circuit.selections.exists(fit(circuit) > _._2.fit(circuit)) 
+		circuit.selections.exists(fit(circuit) > _.fit(circuit)) 
 }
 
 JuggleFest.main(args);
